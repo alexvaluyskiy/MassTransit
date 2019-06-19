@@ -12,7 +12,11 @@
 // specific language governing permissions and limitations under the License.
 namespace MassTransit.ActiveMqTransport.Topology.Builders
 {
+    using System.Linq;
+    using System.Security.Cryptography;
+    using System.Text;
     using Entities;
+    using Util;
 
 
     public class PublishEndpointBrokerTopologyBuilder :
@@ -21,7 +25,7 @@ namespace MassTransit.ActiveMqTransport.Topology.Builders
     {
         readonly PublishBrokerTopologyOptions _options;
 
-        public PublishEndpointBrokerTopologyBuilder(PublishBrokerTopologyOptions options = PublishBrokerTopologyOptions.FlattenHierarchy)
+        public PublishEndpointBrokerTopologyBuilder(PublishBrokerTopologyOptions options = PublishBrokerTopologyOptions.MaintainHierarchy)
         {
             _options = options;
         }
@@ -64,8 +68,19 @@ namespace MassTransit.ActiveMqTransport.Topology.Builders
                 set
                 {
                     _topic = value;
-//                    if (_builder.Topic != null)
-//                        _builder.BindTopic(_builder.Topic, _topic, "");
+                    if (_builder.Topic != null)
+                    {
+                        var subscriptionName = string.Join("-", value.Topic.EntityName.Split('/').Reverse());
+                        //var subscriptionDescription = new SubscriptionDescription(_builder.Topic.Topic.TopicDescription.Path,
+                        //    GenerateSubscriptionName(subscriptionName))
+                        //{
+                        //    ForwardTo = value.Topic.TopicDescription.Path
+                        //};
+
+                        //_builder.CreateTopicSubscription(_builder.Topic, _topic, subscriptionDescription);
+
+                        _builder.CreateQueue(GenerateSubscriptionName(subscriptionName), false, false);
+                    }
                 }
             }
 
@@ -90,6 +105,27 @@ namespace MassTransit.ActiveMqTransport.Topology.Builders
             public ConsumerHandle BindConsumer(TopicHandle topic, QueueHandle queue, string selector)
             {
                 return _builder.BindConsumer(topic, queue, selector);
+            }
+
+            string GenerateSubscriptionName(string subscriptionName)
+            {
+                string name;
+                if (subscriptionName.Length > 50)
+                {
+                    string hashed;
+                    using (var hasher = new SHA1Managed())
+                    {
+                        byte[] buffer = Encoding.UTF8.GetBytes(subscriptionName);
+                        byte[] hash = hasher.ComputeHash(buffer);
+                        hashed = FormatUtil.Formatter.Format(hash).Substring(0, 6);
+                    }
+
+                    name = $"{subscriptionName.Substring(0, 43)}-{hashed}";
+                }
+                else
+                    name = subscriptionName;
+
+                return name;
             }
         }
     }

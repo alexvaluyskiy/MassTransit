@@ -68,19 +68,22 @@ namespace MassTransit.ActiveMqTransport.Topology.Topologies
 
         public void Apply(IPublishEndpointBrokerTopologyBuilder builder)
         {
-            var exchangeHandle = builder.CreateTopic(_topic.EntityName, _topic.Durable, _topic.AutoDelete);
+            var topicHandle = builder.CreateTopic(_topic.EntityName, _topic.Durable, _topic.AutoDelete);
 
-            if (builder.Topic != null)
-                //                builder.ExchangeBind(builder.Exchange, exchangeHandle, "", new Dictionary<string, object>());
-                //            else
-                //                builder.Exchange = exchangeHandle;
+            builder.Topic = topicHandle;
 
-                foreach (IActiveMqMessagePublishTopology configurator in _implementedMessageTypes)
-                    configurator.Apply(builder);
+            foreach (IActiveMqMessagePublishTopology configurator in _implementedMessageTypes)
+                configurator.Apply(builder);
         }
 
         public SendSettings GetSendSettings()
         {
+            var builder = new PublishEndpointBrokerTopologyBuilder();
+
+            Apply(builder);
+
+            var b = builder.BuildBrokerTopology();
+
             return new TopicSendSettings(_topic.EntityName, _topic.Durable, _topic.AutoDelete);
         }
 
